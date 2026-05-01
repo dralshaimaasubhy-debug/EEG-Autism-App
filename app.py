@@ -43,7 +43,7 @@ age = col2.number_input("Age (months)", 1, 24, 6)
 st.subheader("📁 Upload EEG Data")
 file = st.file_uploader("Upload CSV")
 
-# ✅ دالة إنشاء PDF
+# ✅ دالة PDF
 def create_pdf(name, age, diagnosis, confidence):
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(temp_file.name, pagesize=letter)
@@ -59,19 +59,19 @@ def create_pdf(name, age, diagnosis, confidence):
     c.save()
     return temp_file.name
 
-# ✅ تشغيل النموذج عند رفع ملف
+# ✅ لما المستخدم يرفع ملف
 if file:
     data = pd.read_csv(file)
 
-    # ✅ تحميل الموديل
-    model = joblib.load("autism_model.pkl")
-
-    # ✅ حذف الأعمدة غير المستخدمة (لازم نفس التدريب)
+    # ✅ حل مشكلة الأعمدة (مهم جدًا)
     data = data.drop(columns=[
         "age/month", "Sex", "Ethnicity",
         "Jaundice", "Family_mem_with_ASD",
         "Who completed the test"
-    ])
+    ], errors='ignore')
+
+    # ✅ تحميل الموديل
+    model = joblib.load("autism_model.pkl")
 
     # ✅ التنبؤ
     pred = model.predict(data)
@@ -110,7 +110,7 @@ if file:
     # ✅ إنشاء PDF
     pdf_file = create_pdf(name, age, diagnosis, confidence)
 
-    # ✅ زر تحميل
+    # ✅ زر تحميل PDF
     with open(pdf_file, "rb") as f:
         st.download_button(
             label="📄 Download Medical Report",
