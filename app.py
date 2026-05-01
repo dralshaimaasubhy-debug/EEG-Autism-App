@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import random
+import joblib
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import tempfile
@@ -43,7 +43,7 @@ age = col2.number_input("Age (months)", 1, 24, 6)
 st.subheader("📁 Upload EEG Data")
 file = st.file_uploader("Upload CSV")
 
-# ✅ إنشاء PDF
+# ✅ دالة إنشاء PDF
 def create_pdf(name, age, diagnosis, confidence):
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(temp_file.name, pagesize=letter)
@@ -59,38 +59,45 @@ def create_pdf(name, age, diagnosis, confidence):
     c.save()
     return temp_file.name
 
-# ✅ لما المستخدم يرفع ملف
+# ✅ تشغيل النموذج عند رفع ملف
 if file:
     data = pd.read_csv(file)
- # ✅تحليل بسيط (مش عشوائي أقوى شوية)
-    avg = data.mean().mean()
 
-    if avg > 700:
-        diagnosis = "Positive"
-        confidence = 85
-    else:
-        diagnosis = "Negative"
-        confidence = 80
+    # ✅ تحميل الموديل
+    model = joblib.load("autism_model.pkl")
+
+    # ✅ حذف الأعمدة غير المستخدمة (لازم نفس التدريب)
+    data = data.drop(columns=[
+        "age/month", "Sex", "Ethnicity",
+        "Jaundice", "Family_mem_with_ASD",
+        "Who completed the test"
+    ])
+
+    # ✅ التنبؤ
+    pred = model.predict(data)
+    prob = model.predict_proba(data)
+
+    diagnosis = "Positive" if pred[0] == 1 else "Negative"
+    confidence = round(max(prob[0]) * 100, 2)
 
     # ✅ عرض النتيجة
     col3, col4 = st.columns(2)
-
     col3.metric("Diagnosis", diagnosis)
     col4.metric("Confidence", f"{confidence}%")
 
-    # ✅ رسالة الحالة
+    # ✅ رسالة
     if diagnosis == "Positive":
         st.error("⚠️ Autism risk detected")
     else:
         st.success("✅ Normal brain activity")
 
-    # -------- Model --------
+    # -------- Model Info --------
     st.subheader("⚙️ Model Performance")
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Accuracy", "64.1%")
+    c1.metric("Model", "Random Forest")
     c2.metric("Channels", data.shape[1])
-    c3.metric("Data Points", data.shape[0])
+    c3.metric("Samples", data.shape[0])
 
     # -------- Statistics --------
     st.subheader("📊 Signal Statistics")
@@ -103,7 +110,7 @@ if file:
     # ✅ إنشاء PDF
     pdf_file = create_pdf(name, age, diagnosis, confidence)
 
-    # ✅ زر تحميل PDF
+    # ✅ زر تحميل
     with open(pdf_file, "rb") as f:
         st.download_button(
             label="📄 Download Medical Report",
